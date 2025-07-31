@@ -1,5 +1,4 @@
 import os
-import platform
 import random
 import subprocess
 import requests
@@ -12,12 +11,6 @@ from telegram.ext import (
     ContextTypes,
     ConversationHandler,
 )
-
-# ffmpeg পাথ সেট (Windows/Linux অনুযায়ী)
-if platform.system() == "Windows":
-    FFMPEG_PATH = os.path.join("bin", "ffmpeg.exe")
-else:
-    FFMPEG_PATH = os.path.join("bin", "ffmpeg")
 
 LOGO_FOLDER = "logos"
 FILTERS = [
@@ -80,7 +73,7 @@ def download_facebook_video(url, filename):
 def apply_filter_and_logo(video_path, logo_path, output_path):
     chosen_filter = random.choice(FILTERS)
     command = [
-        FFMPEG_PATH,
+        "ffmpeg",  # Render এ ffmpeg system-wide ইনস্টল থাকে, তাই সরাসরি "ffmpeg"
         "-i", video_path,
         "-i", logo_path,
         "-filter_complex", f"[0:v]lut3d=file={chosen_filter}[v];[v][1:v]overlay=W-w-10:H-h-10",
@@ -98,7 +91,8 @@ conv_handler = ConversationHandler(
 )
 
 def main():
-    app = Application.builder().token(os.getenv("BOT_TOKEN")).build()
+    token = os.getenv("BOT_TOKEN")
+    app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(conv_handler)
     print("Bot running...")
