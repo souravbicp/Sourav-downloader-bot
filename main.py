@@ -6,20 +6,23 @@ from flask import Flask, request
 from telegram import Update, Bot, InputFile
 from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, ConversationHandler
 
+# Environment variables
 TOKEN = os.environ.get("BOT_TOKEN")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
+# Flask app
 app = Flask(__name__)
 bot = Bot(token=TOKEN)
 dispatcher = Dispatcher(bot, None, use_context=True)
 
+# Logo folder
 LOGO_FOLDER = "logos"
 FILTERS = [
-    "filters/cinematic.lut",
-    "filters/retro.lut",
-    "filters/vivid.lut",
-    "filters/boost.lut",
-    "filters/light.lut"
+    "cinematic.lut",
+    "retro.lut",
+    "vivid.lut",
+    "boost.lut",
+    "light.lut"
 ]
 
 if not os.path.exists(LOGO_FOLDER):
@@ -27,22 +30,22 @@ if not os.path.exists(LOGO_FOLDER):
 
 ASK_LOGO = 1
 
-# Start Command
+# Start command
 def start(update, context):
     update.message.reply_text("Send me a Facebook video link, then send your logo image (PNG/JPG).")
 
-# Step 1: Receive video link
+# Step 1: Get video link
 def receive_video_link(update, context):
     context.user_data["video_link"] = update.message.text
     update.message.reply_text("Got the video link! Now send your logo image.")
     return ASK_LOGO
 
-# Step 2: Receive logo and process
+# Step 2: Get logo and process
 def receive_logo(update, context):
     user_id = update.message.from_user.id
     logo_path = os.path.join(LOGO_FOLDER, f"{user_id}.png")
 
-    # Save logo
+    # Download logo
     photo_file = update.message.photo[-1].get_file()
     photo_file.download(logo_path)
 
@@ -104,6 +107,7 @@ conv_handler = ConversationHandler(
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(conv_handler)
 
+# Webhook routes
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
