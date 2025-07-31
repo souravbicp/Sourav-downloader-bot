@@ -6,13 +6,16 @@ from flask import Flask, request
 from telegram import Update, Bot, InputFile
 from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, ConversationHandler
 
+# Environment variables
 TOKEN = os.environ.get("BOT_TOKEN")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
+# Flask app
 app = Flask(__name__)
 bot = Bot(token=TOKEN)
 dispatcher = Dispatcher(bot, None, use_context=True)
 
+# Folders and filters
 LOGO_FOLDER = "logos"
 FILTERS = [
     "filters/cinematic.lut",
@@ -25,29 +28,29 @@ FILTERS = [
 if not os.path.exists(LOGO_FOLDER):
     os.makedirs(LOGO_FOLDER)
 
+# Conversation step
 ASK_LOGO = 1
 
 # Start command
 def start(update, context):
-    update.message.reply_text("Send me a public Facebook video link and then send your logo image.")
+    update.message.reply_text("Send me a public Facebook video link, then send your logo image (PNG/JPG).")
 
-# Receive video link
+# Step 1: Get video link
 def receive_video_link(update, context):
-    link = update.message.text
-    context.user_data["video_link"] = link
-    update.message.reply_text("Got the video link! Now send me the logo image (PNG or JPG).")
+    context.user_data["video_link"] = update.message.text
+    update.message.reply_text("Got the video link! Now send me the logo image.")
     return ASK_LOGO
 
-# Receive logo image and process video
+# Step 2: Get logo and process video
 def receive_logo(update, context):
     user_id = update.message.from_user.id
     logo_path = os.path.join(LOGO_FOLDER, f"{user_id}.png")
 
-    # Download photo
+    # Download logo
     photo_file = update.message.photo[-1].get_file()
     photo_file.download(logo_path)
 
-    update.message.reply_text("Processing video, please wait...")
+    update.message.reply_text("Processing your video, please wait...")
 
     video_url = context.user_data.get("video_link")
     if not video_url:
@@ -57,7 +60,7 @@ def receive_logo(update, context):
     video_file = f"{user_id}_video.mp4"
     output_file = f"{user_id}_output.mp4"
 
-    # Download video function
+    # Download Facebook video
     def download_facebook_video(url, filename):
         r = requests.get(url, stream=True)
         with open(filename, "wb") as f:
@@ -65,7 +68,7 @@ def receive_logo(update, context):
                 if chunk:
                     f.write(chunk)
 
-    # Apply filter and logo function
+    # Apply filter and logo
     def apply_filter_and_logo(video_path, logo_path, output_path):
         chosen_filter = random.choice(FILTERS)
         command = [
@@ -85,17 +88,18 @@ def receive_logo(update, context):
         update.message.reply_text(f"Error processing video: {e}")
         return ConversationHandler.END
 
-    # Send back video
+    # Send processed video
     with open(output_file, "rb") as f:
         update.message.reply_video(video=InputFile(f))
 
-    # Clean up
+    # Cleanup
     for fpath in [video_file, output_file, logo_path]:
         if os.path.exists(fpath):
             os.remove(fpath)
 
     return ConversationHandler.END
 
+# Conversation handler
 conv_handler = ConversationHandler(
     entry_points=[MessageHandler(Filters.text & ~Filters.command, receive_video_link)],
     states={ASK_LOGO: [MessageHandler(Filters.photo, receive_logo)]},
@@ -105,6 +109,7 @@ conv_handler = ConversationHandler(
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(conv_handler)
 
+# Webhook routes
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
