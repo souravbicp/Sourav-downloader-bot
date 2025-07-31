@@ -1,20 +1,32 @@
 import os, random, subprocess, requests
-from telegram import Update, InputFile
+from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
 
+# Bot Token
 TOKEN = os.getenv("BOT_TOKEN")
-LOGO_FOLDER = "logos"
-FILTERS = ["filters/cinematic.lut", "filters/retro.lut", "filters/vivid.lut", "filters/boost.lut", "filters/light.lut"]
 
+# Folders & Filters
+LOGO_FOLDER = "logos"
+FILTERS = [
+    "filters/cinematic.lut",
+    "filters/retro.lut",
+    "filters/vivid.lut",
+    "filters/boost.lut",
+    "filters/light.lut"
+]
+
+# Create logo folder if not exists
 if not os.path.exists(LOGO_FOLDER):
     os.makedirs(LOGO_FOLDER)
 
-# Conversation Steps
+# Conversation step
 ASK_LOGO = range(1)
 
-# Start Command
+# Start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Send me a public Facebook video link and I’ll add your logo with a professional filter!")
+    await update.message.reply_text(
+        "Send me a public Facebook video link and I’ll add your logo with a professional filter!"
+    )
 
 # Handle Facebook video link
 async def handle_video_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -25,7 +37,7 @@ async def handle_video_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Handle logo upload and process
 async def handle_logo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Save logo
+    # Save logo file
     logo_path = f"{LOGO_FOLDER}/{update.message.from_user.id}.png"
     photo_file = await update.message.photo[-1].get_file()
     await photo_file.download_to_drive(logo_path)
@@ -41,24 +53,24 @@ async def handle_logo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     filtered_video = "output.mp4"
     apply_filter_and_logo(video_file, logo_path, filtered_video)
 
-    # Send video back
+    # Send processed video
     with open(filtered_video, "rb") as f:
         await update.message.reply_video(video=f)
 
-    # Cleanup
+    # Cleanup files
     os.remove(video_file)
     os.remove(filtered_video)
     os.remove(logo_path)
     return ConversationHandler.END
 
-# Function to download Facebook video
+# Download Facebook video (basic)
 def download_facebook_video(url, filename):
     r = requests.get(url, stream=True)
     with open(filename, "wb") as f:
         for chunk in r.iter_content(chunk_size=1024*1024):
             f.write(chunk)
 
-# Function to apply filter and logo
+# Apply LUT filter and logo using ffmpeg
 def apply_filter_and_logo(video_path, logo_path, output_path):
     chosen_filter = random.choice(FILTERS)
     command = [
@@ -74,9 +86,7 @@ def apply_filter_and_logo(video_path, logo_path, output_path):
 # Conversation handler
 conv_handler = ConversationHandler(
     entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, handle_video_link)],
-    states={
-        ASK_LOGO: [MessageHandler(filters.PHOTO, handle_logo)]
-    },
+    states={ASK_LOGO: [MessageHandler(filters.PHOTO, handle_logo)]},
     fallbacks=[]
 )
 
@@ -88,4 +98,4 @@ def main():
     app.run_polling()
 
 if __name__ == "__main__":
-        main()
+    main()
